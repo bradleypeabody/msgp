@@ -51,7 +51,12 @@ func PrintFile(file string, f *parse.FileSet, mode gen.Method) error {
 func format(file string, data []byte) error {
 	out, err := imports.Process(file, data, nil)
 	if err != nil {
-		return err
+		tmpf, err2 := ioutil.TempFile("", "")
+		defer tmpf.Close()
+		if err2 == nil {
+			tmpf.Write(data)
+		}
+		return fmt.Errorf("format(%q, data) error: %v; (wrote temp results to %s)", file, err, tmpf.Name())
 	}
 	return ioutil.WriteFile(file, out, 0600)
 }
