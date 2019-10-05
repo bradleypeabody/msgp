@@ -3,6 +3,7 @@ package gen
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bradleypeabody/msgp/msgp"
 )
@@ -18,6 +19,7 @@ type marshalGen struct {
 	p    printer
 	fuse []byte
 	ctx  *Context
+	oe   omitemptyGen
 }
 
 func (m *marshalGen) Method() Method { return Marshal }
@@ -105,17 +107,64 @@ func (m *marshalGen) tuple(s *Struct) {
 }
 
 func (m *marshalGen) mapstruct(s *Struct) {
-	data := make([]byte, 0, 64)
-	data = msgp.AppendMapHeader(data, uint32(len(s.Fields)))
-	m.p.printf("\n// map header, size %d", len(s.Fields))
-	m.Fuse(data)
-	if len(s.Fields) == 0 {
-		m.fuseHook()
+
+	var data []byte
+	nfields := len(s.Fields)
+
+	omitemptyenc := m.oe.isEncForAnyFields(s.Fields)
+	var fieldNVar, fieldEMVar string
+	if omitemptyenc {
+
+		fieldNVar = strings.ReplaceAll(s.Varname(), ".", "__") + "FieldN"
+		fieldEMVar = strings.ReplaceAll(s.Varname(), ".", "__") + "EmptyMask"
+
+		m.p.printf("\n// omitempty: check for empty values")
+		m.p.printf("\n%s := %d", fieldNVar, nfields)
+		m.p.printf("\nvar %s %s; _ = %s", fieldEMVar, m.oe.bmaskType(nfields), fieldEMVar)
+		for i, sf := range s.Fields {
+			if !m.p.ok() {
+				return
+			}
+			if m.oe.isEncField(&s.Fields[i]) {
+				m.p.printf("\nif %s {", m.oe.emptyExpr(sf.FieldElem, s.Varname()+"."+sf.FieldName))
+				m.p.printf("\n%s--", fieldNVar)
+				m.p.printf("\n%s", m.oe.bmaskAssign1(fieldEMVar, i, nfields))
+				m.p.printf("\n}")
+			}
+		}
+
+		m.p.printf("\n// dynamic map header, size %s", fieldNVar)
+		m.oe.writeMarshalDynMapHeader(&m.p, fieldNVar, nfields)
+		if !m.p.ok() {
+			return
+		}
+
+		// quick return for the case where the entire thing is empty
+		m.p.printf("\nif %s == 0 { return }", fieldNVar)
+	} else {
+
+		// non-omitempty version
+		data = make([]byte, 0, 64)
+		data = msgp.AppendMapHeader(data, uint32(len(s.Fields)))
+		m.p.printf("\n// map header, size %d", len(s.Fields))
+		m.Fuse(data)
+		if len(s.Fields) == 0 {
+			m.fuseHook()
+		}
+
 	}
+
 	for i := range s.Fields {
 		if !m.p.ok() {
 			return
 		}
+
+		// if field is omitempty/omitemptyenc, wrap with if statement based on the emptymask
+		oeField := m.oe.isEncField(&s.Fields[i])
+		if oeField {
+			m.p.printf("\nif %s == 0 { // if not empty", m.oe.bmaskRead(fieldEMVar, i, nfields))
+		}
+
 		data = msgp.AppendString(nil, s.Fields[i].FieldTag)
 
 		m.p.printf("\n// string %q", s.Fields[i].FieldTag)
@@ -124,6 +173,11 @@ func (m *marshalGen) mapstruct(s *Struct) {
 		m.ctx.PushString(s.Fields[i].FieldName)
 		next(m, s.Fields[i].FieldElem)
 		m.ctx.Pop()
+
+		if oeField {
+			m.p.printf("\n}") // close if statement
+		}
+
 	}
 }
 

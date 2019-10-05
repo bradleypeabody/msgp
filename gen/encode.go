@@ -3,6 +3,7 @@ package gen
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bradleypeabody/msgp/msgp"
 )
@@ -18,6 +19,7 @@ type encodeGen struct {
 	p    printer
 	fuse []byte
 	ctx  *Context
+	oe   omitemptyGen
 }
 
 func (e *encodeGen) Method() Method { return Encode }
@@ -110,17 +112,64 @@ func (e *encodeGen) appendraw(bts []byte) {
 }
 
 func (e *encodeGen) structmap(s *Struct) {
+
+	var data []byte
 	nfields := len(s.Fields)
-	data := msgp.AppendMapHeader(nil, uint32(nfields))
-	e.p.printf("\n// map header, size %d", nfields)
-	e.Fuse(data)
-	if len(s.Fields) == 0 {
-		e.fuseHook()
+
+	omitemptyenc := e.oe.isEncForAnyFields(s.Fields)
+	var fieldNVar, fieldEMVar string
+	if omitemptyenc {
+
+		fieldNVar = strings.ReplaceAll(s.Varname(), ".", "__") + "FieldN"
+		fieldEMVar = strings.ReplaceAll(s.Varname(), ".", "__") + "EmptyMask"
+
+		e.p.printf("\n// omitempty: check for empty values")
+		e.p.printf("\n%s := %d", fieldNVar, nfields)
+		e.p.printf("\nvar %s %s; _ = %s", fieldEMVar, e.oe.bmaskType(nfields), fieldEMVar)
+		for i, sf := range s.Fields {
+			if !e.p.ok() {
+				return
+			}
+			if e.oe.isEncField(&s.Fields[i]) {
+				e.p.printf("\nif %s {", e.oe.emptyExpr(sf.FieldElem, s.Varname()+"."+sf.FieldName))
+				e.p.printf("\n%s--", fieldNVar)
+				e.p.printf("\n%s", e.oe.bmaskAssign1(fieldEMVar, i, nfields))
+				e.p.printf("\n}")
+			}
+		}
+
+		e.p.printf("\n// dynamic map header, size %s", fieldNVar)
+		e.oe.writeEncodeDynMapHeader(&e.p, fieldNVar, nfields)
+		if !e.p.ok() {
+			return
+		}
+
+		// quick return for the case where the entire thing is empty
+		e.p.printf("\nif %s == 0 { return }", fieldNVar)
+
+	} else {
+
+		// non-omitempty version
+		data = msgp.AppendMapHeader(nil, uint32(nfields))
+		e.p.printf("\n// map header, size %d", nfields)
+		e.Fuse(data)
+		if len(s.Fields) == 0 {
+			e.fuseHook()
+		}
+
 	}
+
 	for i := range s.Fields {
 		if !e.p.ok() {
 			return
 		}
+
+		// if field is omitempty/omitemptyenc, wrap with if statement based on the emptymask
+		oeField := e.oe.isEncField(&s.Fields[i])
+		if oeField {
+			e.p.printf("\nif %s == 0 { // if not empty", e.oe.bmaskRead(fieldEMVar, i, nfields))
+		}
+
 		data = msgp.AppendString(nil, s.Fields[i].FieldTag)
 		e.p.printf("\n// write %q", s.Fields[i].FieldTag)
 		e.Fuse(data)
@@ -128,6 +177,11 @@ func (e *encodeGen) structmap(s *Struct) {
 		e.ctx.PushString(s.Fields[i].FieldName)
 		next(e, s.Fields[i].FieldElem)
 		e.ctx.Pop()
+
+		if oeField {
+			e.p.printf("\n}") // close if statement
+		}
+
 	}
 }
 

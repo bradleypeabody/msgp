@@ -402,10 +402,11 @@ func (s *Struct) Complexity() int {
 }
 
 type StructField struct {
-	FieldTag  string // the string inside the `msg:""` tag
-	RawTag    string // the full struct tag
-	FieldName string // the name of the struct field
-	FieldElem Elem   // the field type
+	FieldTag      string   // the string inside the `msg:""` tag up to the first comma
+	FieldTagParts []string // the string inside the `msg:""` tag split by commas
+	RawTag        string   // the full struct tag
+	FieldName     string   // the name of the struct field
+	FieldElem     Elem     // the field type
 }
 
 type ShimMode int
