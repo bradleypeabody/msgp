@@ -3,7 +3,6 @@ package gen
 import (
 	"io"
 	"strconv"
-	"strings"
 )
 
 func decode(w io.Writer) *decodeGen {
@@ -18,7 +17,6 @@ type decodeGen struct {
 	p        printer
 	hasfield bool
 	ctx      *Context
-	oe       omitemptyGen
 }
 
 func (d *decodeGen) Method() Method { return Decode }
@@ -94,16 +92,6 @@ func (d *decodeGen) structAsTuple(s *Struct) {
 }
 
 func (d *decodeGen) structAsMap(s *Struct) {
-
-	omitemptydec := d.oe.isDecForAnyFields(s.Fields)
-	nfields := len(s.Fields)
-	var fieldFMVar string
-	if omitemptydec {
-		d.p.print("\n// omitempty: keep a bitmask of fields we find in the map")
-		fieldFMVar = strings.ReplaceAll(s.Varname(), ".", "__") + "FoundMask"
-		d.p.printf("\nvar %s %s; _ = %s", fieldFMVar, d.oe.bmaskType(nfields), fieldFMVar)
-	}
-
 	d.needsField()
 	sz := randIdent()
 	d.p.declare(sz, u32)
@@ -117,9 +105,6 @@ func (d *decodeGen) structAsMap(s *Struct) {
 		d.p.printf("\ncase \"%s\":", s.Fields[i].FieldTag)
 		next(d, s.Fields[i].FieldElem)
 		d.ctx.Pop()
-		if d.oe.isDecField(&s.Fields[i]) {
-			d.p.printf("\n%s", d.oe.bmaskAssign1(fieldFMVar, i, nfields))
-		}
 		if !d.p.ok() {
 			return
 		}
@@ -129,20 +114,6 @@ func (d *decodeGen) structAsMap(s *Struct) {
 
 	d.p.closeblock() // close switch
 	d.p.closeblock() // close for loop
-
-	if omitemptydec {
-		d.p.print("\n// omitempty: for specified fields if not found assign zero value")
-		for i, sf := range s.Fields {
-			if !d.p.ok() {
-				return
-			}
-			if d.oe.isDecField(&s.Fields[i]) {
-				d.p.printf("\nif %s == 0 { // if not found", d.oe.bmaskRead(fieldFMVar, i, nfields))
-				d.p.printf("\n%s", d.oe.emptyAssign(sf.FieldElem, s.Varname()+"."+sf.FieldName))
-				d.p.print("\n}")
-			}
-		}
-	}
 }
 
 func (d *decodeGen) gBase(b *BaseElem) {

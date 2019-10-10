@@ -19,7 +19,6 @@ type marshalGen struct {
 	p    printer
 	fuse []byte
 	ctx  *Context
-	oe   omitemptyGen
 }
 
 func (m *marshalGen) Method() Method { return Marshal }
@@ -108,39 +107,47 @@ func (m *marshalGen) tuple(s *Struct) {
 
 func (m *marshalGen) mapstruct(s *Struct) {
 
+	oeIdentPrefix := randIdent()
+
 	var data []byte
 	nfields := len(s.Fields)
+	bm := bmask{
+		bitlen:  nfields,
+		varname: oeIdentPrefix + "Mask",
+	}
 
-	omitemptyenc := m.oe.isEncForAnyFields(s.Fields)
-	var fieldNVar, fieldEMVar string
-	if omitemptyenc {
+	omitempty := s.AnyHasTagPart("omitempty")
+	var fieldNVar string
+	if omitempty {
 
-		fieldNVar = strings.ReplaceAll(s.Varname(), ".", "__") + "FieldN"
-		fieldEMVar = strings.ReplaceAll(s.Varname(), ".", "__") + "EmptyMask"
+		fieldNVar = oeIdentPrefix + "Len"
 
 		m.p.printf("\n// omitempty: check for empty values")
 		m.p.printf("\n%s := %d", fieldNVar, nfields)
-		m.p.printf("\nvar %s %s; _ = %s", fieldEMVar, m.oe.bmaskType(nfields), fieldEMVar)
+		m.p.printf("\n%s", bm.typeDecl())
 		for i, sf := range s.Fields {
 			if !m.p.ok() {
 				return
 			}
-			if m.oe.isEncField(&s.Fields[i]) {
-				m.p.printf("\nif %s {", m.oe.emptyExpr(sf.FieldElem, s.Varname()+"."+sf.FieldName))
+			if ize := sf.FieldElem.IfZeroExpr(); ize != "" && sf.HasTagPart("omitempty") {
+				m.p.printf("\nif %s {", ize)
 				m.p.printf("\n%s--", fieldNVar)
-				m.p.printf("\n%s", m.oe.bmaskAssign1(fieldEMVar, i, nfields))
+				m.p.printf("\n%s", bm.setStmt(i))
 				m.p.printf("\n}")
 			}
 		}
 
-		m.p.printf("\n// dynamic map header, size %s", fieldNVar)
-		m.oe.writeMarshalDynMapHeader(&m.p, fieldNVar, nfields)
+		m.p.printf("\n// variable map header, size %s", fieldNVar)
+		m.p.varMapHeader("o = append(o,", ")", fieldNVar, nfields)
 		if !m.p.ok() {
 			return
 		}
 
-		// quick return for the case where the entire thing is empty
-		m.p.printf("\nif %s == 0 { return }", fieldNVar)
+		// quick return for the case where the entire thing is empty, but only at the top level
+		if !strings.Contains(s.Varname(), ".") {
+			m.p.printf("\nif %s == 0 { return }", fieldNVar)
+		}
+
 	} else {
 
 		// non-omitempty version
@@ -159,16 +166,17 @@ func (m *marshalGen) mapstruct(s *Struct) {
 			return
 		}
 
-		// if field is omitempty/omitemptyenc, wrap with if statement based on the emptymask
-		oeField := m.oe.isEncField(&s.Fields[i])
+		// if field is omitempty, wrap with if statement based on the emptymask
+		oeField := s.Fields[i].HasTagPart("omitempty") && s.Fields[i].FieldElem.IfZeroExpr() != ""
 		if oeField {
-			m.p.printf("\nif %s == 0 { // if not empty", m.oe.bmaskRead(fieldEMVar, i, nfields))
+			m.p.printf("\nif %s == 0 { // if not empty", bm.readExpr(i))
 		}
 
 		data = msgp.AppendString(nil, s.Fields[i].FieldTag)
 
 		m.p.printf("\n// string %q", s.Fields[i].FieldTag)
 		m.Fuse(data)
+		m.fuseHook()
 
 		m.ctx.PushString(s.Fields[i].FieldName)
 		next(m, s.Fields[i].FieldElem)

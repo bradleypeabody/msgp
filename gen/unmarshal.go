@@ -3,7 +3,6 @@ package gen
 import (
 	"io"
 	"strconv"
-	"strings"
 )
 
 func unmarshal(w io.Writer) *unmarshalGen {
@@ -17,7 +16,6 @@ type unmarshalGen struct {
 	p        printer
 	hasfield bool
 	ctx      *Context
-	oe       omitemptyGen
 }
 
 func (u *unmarshalGen) Method() Method { return Unmarshal }
@@ -94,16 +92,6 @@ func (u *unmarshalGen) tuple(s *Struct) {
 }
 
 func (u *unmarshalGen) mapstruct(s *Struct) {
-
-	omitemptydec := u.oe.isDecForAnyFields(s.Fields)
-	nfields := len(s.Fields)
-	var fieldFMVar string
-	if omitemptydec {
-		u.p.print("\n// omitempty: keep a bitmask of fields we find in the map")
-		fieldFMVar = strings.ReplaceAll(s.Varname(), ".", "__") + "FoundMask"
-		u.p.printf("\nvar %s %s; _ = %s", fieldFMVar, u.oe.bmaskType(nfields), fieldFMVar)
-	}
-
 	u.needsField()
 	sz := randIdent()
 	u.p.declare(sz, u32)
@@ -121,28 +109,10 @@ func (u *unmarshalGen) mapstruct(s *Struct) {
 		u.ctx.PushString(s.Fields[i].FieldName)
 		next(u, s.Fields[i].FieldElem)
 		u.ctx.Pop()
-		if u.oe.isDecField(&s.Fields[i]) {
-			u.p.printf("\n%s", u.oe.bmaskAssign1(fieldFMVar, i, nfields))
-		}
 	}
 	u.p.print("\ndefault:\nbts, err = msgp.Skip(bts)")
 	u.p.wrapErrCheck(u.ctx.ArgsStr())
 	u.p.print("\n}\n}") // close switch and for loop
-
-	if omitemptydec {
-		u.p.print("\n// omitempty: for specified fields if not found assign zero value")
-		for i, sf := range s.Fields {
-			if !u.p.ok() {
-				return
-			}
-			if u.oe.isDecField(&s.Fields[i]) {
-				u.p.printf("\nif %s == 0 { // if not found", u.oe.bmaskRead(fieldFMVar, i, nfields))
-				u.p.printf("\n%s", u.oe.emptyAssign(sf.FieldElem, s.Varname()+"."+sf.FieldName))
-				u.p.print("\n}")
-			}
-		}
-	}
-
 }
 
 func (u *unmarshalGen) gBase(b *BaseElem) {

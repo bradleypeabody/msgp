@@ -1,51 +1,55 @@
 package _generated
 
+import "time"
+
 //go:generate msgp
 
 type OmitEmpty0 struct {
-	ABool    bool    `msg:"abool,omitempty"`
-	AInt     int     `msg:"aint,omitempty"`
-	AInt8    int8    `msg:"aint8,omitempty"`
-	AInt16   int16   `msg:"aint16,omitempty"`
-	AInt32   int32   `msg:"aint32,omitempty"`
-	AInt64   int64   `msg:"aint64,omitempty"`
-	AUint    uint    `msg:"auint,omitempty"`
-	AUint8   uint8   `msg:"auint8,omitempty"`
-	AUint16  uint16  `msg:"auint16,omitempty"`
-	AUint32  uint32  `msg:"auint32,omitempty"`
-	AUint64  uint64  `msg:"auint64,omitempty"`
-	AFloat32 float32 `msg:"afloat32,omitempty"`
-	AFloat64 float64 `msg:"afloat64,omitempty"`
-	// AComplex64  complex64  `msg:"acomplex64,omitempty"`
-	// AComplex128 complex128 `msg:"acomplex128,omitempty"`
+	ABool       bool       `msg:"abool,omitempty"`
+	AInt        int        `msg:"aint,omitempty"`
+	AInt8       int8       `msg:"aint8,omitempty"`
+	AInt16      int16      `msg:"aint16,omitempty"`
+	AInt32      int32      `msg:"aint32,omitempty"`
+	AInt64      int64      `msg:"aint64,omitempty"`
+	AUint       uint       `msg:"auint,omitempty"`
+	AUint8      uint8      `msg:"auint8,omitempty"`
+	AUint16     uint16     `msg:"auint16,omitempty"`
+	AUint32     uint32     `msg:"auint32,omitempty"`
+	AUint64     uint64     `msg:"auint64,omitempty"`
+	AFloat32    float32    `msg:"afloat32,omitempty"`
+	AFloat64    float64    `msg:"afloat64,omitempty"`
+	AComplex64  complex64  `msg:"acomplex64,omitempty"`
+	AComplex128 complex128 `msg:"acomplex128,omitempty"`
 
-	// ANamedBool    bool    `msg:"anamedbool,omitempty"`
-	// ANamedInt     int     `msg:"anamedint,omitempty"`
-	// ANamedFloat64 float64 `msg:"anamedfloat64,omitempty"`
+	ANamedBool    bool    `msg:"anamedbool,omitempty"`
+	ANamedInt     int     `msg:"anamedint,omitempty"`
+	ANamedFloat64 float64 `msg:"anamedfloat64,omitempty"`
 
-	// AMapStrStr map[string]string `msg:"amapstrstr,omitempty"`
+	AMapStrStr map[string]string `msg:"amapstrstr,omitempty"`
 
-	// APtrNamedStr *NamedString `msg:"aptrnamedstr,omitempty"`
+	APtrNamedStr *NamedString `msg:"aptrnamedstr,omitempty"`
 
-	AString string `msg:"astring,omitempty"`
-	// ANamedString string `msg:"anamedstring,omitempty"`
-	// AByteSlice   []byte `msg:"abyteslice,omitempty"`
+	AString      string `msg:"astring,omitempty"`
+	ANamedString string `msg:"anamedstring,omitempty"`
+	AByteSlice   []byte `msg:"abyteslice,omitempty"`
 
-	// ASliceString      []string      `msg:"aslicestring,omitempty"`
-	// ASliceNamedString []NamedString `msg:"aslicenamedstring,omitempty"`
+	ASliceString      []string      `msg:"aslicestring,omitempty"`
+	ASliceNamedString []NamedString `msg:"aslicenamedstring,omitempty"`
 
-	// ANamedStruct    NamedStruct  `msg:"anamedstruct,omitempty"`
-	// APtrNamedStruct *NamedStruct `msg:"aptrnamedstruct,omitempty"`
+	ANamedStruct    NamedStruct  `msg:"anamedstruct,omitempty"`
+	APtrNamedStruct *NamedStruct `msg:"aptrnamedstruct,omitempty"`
 
-	// AUnnamedStruct struct {
-	// 	A string `msg:"a,omitempty"`
-	// } `msg:"aunnamedstruct,omitempty"` // omitempty not supported on unnamed struct, so
+	AUnnamedStruct struct {
+		A string `msg:"a,omitempty"`
+	} `msg:"aunnamedstruct,omitempty"` // omitempty not supported on unnamed struct
 
-	// EmbeddableStruct `msg:",flatten,omitempty"` // embed flat
+	EmbeddableStruct `msg:",flatten,omitempty"` // embed flat
 
-	// EmbeddableStruct2 `msg:"embeddablestruct2,omitempty"` // embed non-flat
+	EmbeddableStruct2 `msg:"embeddablestruct2,omitempty"` // embed non-flat
 
-	// TODO: Array ?
+	AArrayInt [5]int `msg:"aarrayint,omitempty"` // not supported
+
+	ATime time.Time `msg:"atime,omitempty"`
 }
 
 type NamedBool bool
@@ -171,4 +175,30 @@ type OmitEmptyLotsOFields struct {
 	Field67 string `msg:"field67,omitempty"`
 	Field68 string `msg:"field68,omitempty"`
 	Field69 string `msg:"field69,omitempty"`
+}
+
+type OmitEmpty10 struct {
+	Field00 string `msg:"field00,omitempty"`
+	Field01 string `msg:"field01,omitempty"`
+	Field02 string `msg:"field02,omitempty"`
+	Field03 string `msg:"field03,omitempty"`
+	Field04 string `msg:"field04,omitempty"`
+	Field05 string `msg:"field05,omitempty"`
+	Field06 string `msg:"field06,omitempty"`
+	Field07 string `msg:"field07,omitempty"`
+	Field08 string `msg:"field08,omitempty"`
+	Field09 string `msg:"field09,omitempty"`
+}
+
+type NotOmitEmpty10 struct {
+	Field00 string `msg:"field00"`
+	Field01 string `msg:"field01"`
+	Field02 string `msg:"field02"`
+	Field03 string `msg:"field03"`
+	Field04 string `msg:"field04"`
+	Field05 string `msg:"field05"`
+	Field06 string `msg:"field06"`
+	Field07 string `msg:"field07"`
+	Field08 string `msg:"field08"`
+	Field09 string `msg:"field09"`
 }
